@@ -144,3 +144,4 @@ vite.config.ts.timestamp-*
 *.tfstate.backup
 terraform.tfstate.d/
 crash.log
+.terraform.lock.hcl

@@ -1,0 +1,35 @@
+name: Deploy Microservices
+on: { push: { branches: ["main"] } }
+env:
+  AWS_REGION: us-west-2
+  ECR_FRONTEND: personal-book-frontend
+  ECR_BACKEND: personal-book-backend
+  ECS_CLUSTER: personal-book-cluster
+  SERVICE_FRONTEND: personal-book-fe-svc
+  SERVICE_BACKEND: personal-book-be-svc
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: aws-actions/configure-aws-credentials@v1
+      with: { aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}, aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}, aws-region: ${{ env.AWS_REGION }} }
+    - id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build Backend
+      env: { ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}, IMAGE_TAG: ${{ github.sha }} }
+      run: |
+        cd server
+        docker build -t $ECR_REGISTRY/$ECR_BACKEND:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_BACKEND:$IMAGE_TAG
+    - run: aws ecs update-service --cluster $ECS_CLUSTER --service $SERVICE_BACKEND --force-new-deployment
+
+    - name: Build Frontend
+      env: { ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}, IMAGE_TAG: ${{ github.sha }} }
+      run: |
+        cd client
+        docker build -t $ECR_REGISTRY/$ECR_FRONTEND:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_FRONTEND:$IMAGE_TAG
+    - run: aws ecs update-service --cluster $ECS_CLUSTER --service $SERVICE_FRONTEND --force-new-deployment

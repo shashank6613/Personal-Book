@@ -25,7 +25,9 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v1
 
     - name: Build Backend
-      env: { ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}, IMAGE_TAG: ${{ github.sha }} }
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
       run: |
         cd server
         docker build -t $ECR_REGISTRY/$ECR_BACKEND:$IMAGE_TAG .
@@ -33,7 +35,9 @@ jobs:
     - run: aws ecs update-service --cluster $ECS_CLUSTER --service $SERVICE_BACKEND --force-new-deployment
 
     - name: Build Frontend
-      env: { ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}, IMAGE_TAG: ${{ github.sha }} }
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
       run: |
         cd client
         docker build -t $ECR_REGISTRY/$ECR_FRONTEND:$IMAGE_TAG .

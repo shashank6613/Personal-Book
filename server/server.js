@@ -31,8 +31,6 @@ const lambdaClient = new LambdaClient({ region: AWS_REGION });
 app.use(cors());
 app.use(express.json());
 
-// Serve React Static Files (From the build folder)
-app.use(express.static(path.join(__dirname, 'client/dist')));
 
 // --- MONGODB DATA MODELS ---
 const userSchema = new mongoose.Schema({
@@ -87,7 +85,7 @@ const sendRegistrationEmail = async (recipientEmail, username, secretId) => {
         console.error("SES Error: SENDER_EMAIL_ADDRESS environment variable is not set.");
         return;
     }
-    
+
     const sendCommand = new SendEmailCommand({
         Destination: {
             ToAddresses: [recipientEmail],
@@ -242,10 +240,6 @@ app.put('/api/profile/:userId', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Handle React Routing (Send all other requests to index.html)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
-});
 
 // --- SERVER STARTUP ---
 mongoose.connect(MONGO_URI)

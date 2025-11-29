@@ -8,8 +8,8 @@ env:
   ECR_FRONTEND: personal-book-frontend
   ECR_BACKEND: personal-book-backend
   ECS_CLUSTER: personal-book-cluster
-  SERVICE_FRONTEND: personal-book-fe-svc
-  SERVICE_BACKEND: personal-book-be-svc
+  SERVICE_FRONTEND: personal-book-frontend-service
+  SERVICE_BACKEND: personal-book-backend-service
 
   TASK_DEF_BACKEND: personal-book-backend
   TASK_DEF_FRONTEND: personal-book-frontend
@@ -28,7 +28,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
     - id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      uses: aws-actions/amazon-ecr-login@v2
 
     # --- Backend Build, Push, and Deploy ---
     - name: Build and Push Backend Docker Image

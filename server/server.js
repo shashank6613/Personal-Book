@@ -132,28 +132,6 @@ const sendRegistrationEmail = async (recipientEmail, username, secretId) => {
 };
 
 
-const seedMasterAdmin = async () => {
-    // ... (seedMasterAdmin remains the same) ...
-    try {
-        const adminExists = await User.findOne({ role: 'master' });
-        if (!adminExists) {
-            const newAdmin = new User({
-                username: "Master Admin",
-                email: INITIAL_MASTER_EMAIL,
-                password: INITIAL_MASTER_PASS,
-                role: 'master',
-                secretId: "MASTER"
-            });
-            await newAdmin.save();
-            console.log(`👑 Master Admin created`);
-        }
-    } catch (err) {
-        console.error("Seed Admin Error:", err);
-    }
-};
-
-
-
 // --- MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];

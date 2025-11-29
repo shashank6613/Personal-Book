@@ -128,6 +128,7 @@ const sendRegistrationEmail = async (recipientEmail, username, secretId) => {
         console.log(`✉️ Registration email sent successfully to ${recipientEmail}`);
     } catch (err) {
         console.error(`❌ SES Failed to send email to ${recipientEmail}:`, err);
+        throw new Error(`SES_FAILURE: ${err.message}`);
     }
 };
 
@@ -201,7 +202,16 @@ app.post('/api/users/register', authenticateToken, async (req, res) => {
 
     res.status(201).json(newUser);
     } catch (err) {
-    res.status(500).json({ error: "Registration failed. Email might already exist." });
+        // 🚨 Check for our custom SES error or the MongoDB error
+        if (err.message.includes("SES_FAILURE")) {
+            console.error("Critical SES failure during registration:", err);
+            // Delete the saved user and profile here if SES failure is critical
+            await User.deleteOne({ secretId: newId });
+            await Profile.deleteOne({ userId: newId });
+            return res.status(500).json({ error: "Registration failed. Email service rejected the request. Check CloudWatch logs for details." });
+        }
+        // Catches the MongoDB unique email constraint error, or any other unexpected error
+        res.status(500).json({ error: "Registration failed. Email might already exist." });
     }
 });
 

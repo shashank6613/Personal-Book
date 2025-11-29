@@ -11,16 +11,10 @@ env:
   SERVICE_FRONTEND: personal-book-fe-svc
   SERVICE_BACKEND: personal-book-be-svc
 
-  # 💡 NEW: Define project name to construct exact ECS names
-  PROJECT_NAME: personal-book # <-- REPLACE 'personal-book' with your actual var.project_name value
-
-  # 💡 NEW: Task Definition Family Names (from your .tf file)
-  TASK_DEF_BACKEND: ${{ env.PROJECT_NAME }}-backend
-  TASK_DEF_FRONTEND: ${{ env.PROJECT_NAME }}-frontend
-
-  # 💡 NEW: Container Names (from your .tf file)
-  CONTAINER_BACKEND: ${{ env.PROJECT_NAME }}-backend-container
-  CONTAINER_FRONTEND: ${{ env.PROJECT_NAME }}-frontend-container
+  TASK_DEF_BACKEND: personal-book-backend
+  TASK_DEF_FRONTEND: personal-book-frontend
+  CONTAINER_BACKEND: personal-book-backend-container
+  CONTAINER_FRONTEND: personal-book-frontend-container
 
 jobs:
   deploy:

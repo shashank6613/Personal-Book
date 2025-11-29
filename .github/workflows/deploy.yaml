@@ -11,12 +11,24 @@ env:
   SERVICE_FRONTEND: personal-book-fe-svc
   SERVICE_BACKEND: personal-book-be-svc
 
+  # 💡 NEW: Define project name to construct exact ECS names
+  PROJECT_NAME: personal-book # <-- REPLACE 'personal-book' with your actual var.project_name value
+
+  # 💡 NEW: Task Definition Family Names (from your .tf file)
+  TASK_DEF_BACKEND: ${{ env.PROJECT_NAME }}-backend
+  TASK_DEF_FRONTEND: ${{ env.PROJECT_NAME }}-frontend
+
+  # 💡 NEW: Container Names (from your .tf file)
+  CONTAINER_BACKEND: ${{ env.PROJECT_NAME }}-backend-container
+  CONTAINER_FRONTEND: ${{ env.PROJECT_NAME }}-frontend-container
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: aws-actions/configure-aws-credentials@v1
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -24,7 +36,8 @@ jobs:
     - id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build Backend
+    # --- Backend Build, Push, and Deploy ---
+    - name: Build and Push Backend Docker Image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
@@ -32,9 +45,32 @@ jobs:
         cd server
         docker build -t $ECR_REGISTRY/$ECR_BACKEND:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_BACKEND:$IMAGE_TAG
-    - run: aws ecs update-service --cluster $ECS_CLUSTER --service $SERVICE_BACKEND --force-new-deployment
 
-    - name: Build Frontend
+    # 🚀 REPLACED DEPLOYMENT STEP WITH CLI LOGIC
+    - name: Deploy Backend (Dynamic Task Def Update)
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        FULL_IMAGE_URL: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_BACKEND }}:${{ github.sha }}
+      run: |
+        # 1. Fetch current Task Definition JSON
+        TASK_DEF_JSON=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_BACKEND }} --query taskDefinition --output json)
+
+        # 2. Update the image tag in the JSON using jq (removes metadata, updates image)
+        # Note: jq is pre-installed on ubuntu-latest runners
+        NEW_TASK_DEF_JSON=$(echo "$TASK_DEF_JSON" | \
+          jq --arg CONTAINER_NAME "${{ env.CONTAINER_BACKEND }}" \
+             --arg NEW_IMAGE_URL "${{ env.FULL_IMAGE_URL }}" \
+             '(.containerDefinitions[] | select(.name == $CONTAINER_NAME) | .image) = $NEW_IMAGE_URL |
+              del(.status) | del(.taskDefinitionArn) | del(.revision) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+
+        # 3. Register a new Task Definition revision
+        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF_JSON" --query 'taskDefinition.taskDefinitionArn' --output text)
+
+        # 4. Update the ECS service to use the new Task Definition
+        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.SERVICE_BACKEND }} --task-definition "$NEW_TASK_DEF_ARN"
+
+    # --- Frontend Build, Push, and Deploy ---
+    - name: Build and Push Frontend Docker Image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
@@ -42,4 +78,25 @@ jobs:
         cd client
         docker build -t $ECR_REGISTRY/$ECR_FRONTEND:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_FRONTEND:$IMAGE_TAG
-    - run: aws ecs update-service --cluster $ECS_CLUSTER --service $SERVICE_FRONTEND --force-new-deployment
+
+    # 🚀 REPLACED DEPLOYMENT STEP WITH CLI LOGIC
+    - name: Deploy Frontend (Dynamic Task Def Update)
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        FULL_IMAGE_URL: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_FRONTEND }}:${{ github.sha }}
+      run: |
+        # 1. Fetch current Task Definition JSON
+        TASK_DEF_JSON=$(aws ecs describe-task-definition --task-definition ${{ env.TASK_DEF_FRONTEND }} --query taskDefinition --output json)
+
+        # 2. Update the image tag in the JSON using jq (removes metadata, updates image)
+        NEW_TASK_DEF_JSON=$(echo "$TASK_DEF_JSON" | \
+          jq --arg CONTAINER_NAME "${{ env.CONTAINER_FRONTEND }}" \
+             --arg NEW_IMAGE_URL "${{ env.FULL_IMAGE_URL }}" \
+             '(.containerDefinitions[] | select(.name == $CONTAINER_NAME) | .image) = $NEW_IMAGE_URL |
+              del(.status) | del(.taskDefinitionArn) | del(.revision) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+
+        # 3. Register a new Task Definition revision
+        NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF_JSON" --query 'taskDefinition.taskDefinitionArn' --output text)
+
+        # 4. Update the ECS service to use the new Task Definition
+        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.SERVICE_FRONTEND }} --task-definition "$NEW_TASK_DEF_ARN"
